@@ -69,6 +69,18 @@ namespace BililiveRecorder.Core
                 TriggerPropertyChanged(nameof(Processor));
             }
         }
+        
+        private DanmakuStreamProcessor _danmakuProcessor;
+        public DanmakuStreamProcessor DanmakuProcessor
+        {
+            get => _danmakuProcessor;
+            private set
+            {
+                if (value == _danmakuProcessor) { return; }
+                _danmakuProcessor = value;
+                TriggerPropertyChanged(nameof(DanmakuProcessor));
+            }
+        }
 
         private ConfigV1 _config { get; }
         public IStreamMonitor StreamMonitor { get; }
@@ -268,6 +280,8 @@ namespace BililiveRecorder.Core
                         };
                     };
 
+                    DanmakuProcessor = new DanmakuStreamProcessor(GetDanmakuFilePath(), StreamMonitor);
+
                     _stream = await _response.Content.ReadAsStreamAsync();
                     _stream.ReadTimeout = 3 * 1000;
 
@@ -349,6 +363,14 @@ namespace BililiveRecorder.Core
                     Processor.Dispose();
                     Processor = null;
                 }
+
+                if (DanmakuProcessor != null)
+                {
+                    DanmakuProcessor.FinalizeFile();
+                    DanmakuProcessor.Dispose();
+                    DanmakuProcessor = null;
+                }
+
                 _stream?.Dispose();
                 _stream = null;
                 _response?.Dispose();
@@ -357,6 +379,7 @@ namespace BililiveRecorder.Core
                 _lastUpdateTimestamp = 0;
                 DownloadSpeedKiBps = 0d;
                 DownloadSpeedPersentage = 0d;
+
                 TriggerPropertyChanged(nameof(IsRecording));
             }
             void _UpdateDownloadSpeed(int bytesRead)
@@ -386,11 +409,18 @@ namespace BililiveRecorder.Core
             Dispose(true);
         }
 
+        private readonly int streamRandom = random.Next(100, 999);
+        private readonly DateTime startTime = DateTime.Now;
+
         private string GetStreamFilePath() => Path.Combine(_config.WorkDirectory, RealRoomid.ToString(), "record",
-            $@"record-{RealRoomid}-{DateTime.Now.ToString("yyyyMMdd-HHmmss")}-{random.Next(100, 999)}.flv".RemoveInvalidFileName());
+            $@"record-{RealRoomid}-{startTime.ToString("yyyyMMdd-HHmmss")}-{streamRandom}.flv".RemoveInvalidFileName());
+
+        private string GetDanmakuFilePath() => Path.Combine(_config.WorkDirectory, RealRoomid.ToString(), "danmaku",
+            $@"record-{RealRoomid}-{startTime.ToString("yyyyMMdd-HHmmss")}-{streamRandom}.xml".RemoveInvalidFileName());
 
         private string GetClipFilePath() => Path.Combine(_config.WorkDirectory, RealRoomid.ToString(), "clip",
             $@"clip-{RealRoomid}-{DateTime.Now.ToString("yyyyMMdd-HHmmss")}-{random.Next(100, 999)}.flv".RemoveInvalidFileName());
+
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void TriggerPropertyChanged(string propertyName)
@@ -409,6 +439,7 @@ namespace BililiveRecorder.Core
                     StopRecord();
                     Processor?.Dispose();
                     StreamMonitor?.Dispose();
+                    DanmakuProcessor?.Dispose();
                     _response?.Dispose();
                     _stream?.Dispose();
                     cancellationTokenSource?.Dispose();

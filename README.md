@@ -1,3 +1,7 @@
+Modifications made by me: Just a very crude comment download feature I wrote.
+
+Below is the original README.md:
+
 # BiliBili Stream Recorder
 
 [![Build status](https://ci.appveyor.com/api/projects/status/1n4822yitgtu7ht7?svg=true)](https://ci.appveyor.com/project/Genteure/bililiverecorder)
