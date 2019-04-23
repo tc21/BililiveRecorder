@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -9,7 +10,6 @@ namespace BililiveRecorder.Core
     /* TODO
      * - RecordedRoom 最下方的改动，是为了弹幕和视频名字相同，但是怎么看怎么不好看
      * - 最好用 XDocument 之类的正经 XML Writer，至少加个 HTMLEncode 之类的
-     * - 弹幕颜色解析：目前只是统一做成了白色
      */
 
     // very roughly written since I couldn't be assed to make it better
@@ -17,6 +17,7 @@ namespace BililiveRecorder.Core
     {
         //<d p="在视频中的秒浮点数,弹幕类型,弹幕字号,十进制RGB颜色,发送UNIX时间戳,弹幕池保持0普通,hash后的发送者id,数据库id">弹幕内容</d>
         //<d p = "1.588,        1,      25,    16777215,    1548576075,  0,            b86462f0,      0" > 就休息了5分钟，人太多了</d>
+        //[0, 1, 25, 16777215, 1540904619, -406758470, 0, "f20e41ac", 0, 0],
         private readonly int fontSize;
         private static readonly string preamble = string.Join("\n", new string[] {
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
@@ -39,14 +40,26 @@ namespace BililiveRecorder.Core
 
         public void Add(DanmakuModel danmaku, double secondsElapsed)
         {
-            string metadata = string.Format(
-                "{0},1,{1},16777215,{2},0,0,0",
+            var json = JObject.Parse(danmaku.RawData);
+            var metadata = json["info"][0];
+
+            var danmakuType = metadata[1].ToObject<int>();
+            var fontSize = metadata[2].ToObject<int>();
+            var colorCode = metadata[3].ToObject<int>();
+            var unixTimestamp = metadata[4].ToObject<int>();
+            var senderId = metadata[7].ToObject<string>();
+
+            string p = string.Format(
+                "{0},{1},{2},{3},{4},0,{5},0",
                 secondsElapsed,
+                danmakuType,
                 fontSize,
-                (int)DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds
+                colorCode,
+                unixTimestamp,
+                senderId
             );
 
-            lines.Add(string.Format("<d p=\"{0}\">{1}</d>", metadata, danmaku.CommentText));
+            lines.Add(string.Format("<d p=\"{0}\">{1}</d>", p, danmaku.CommentText));
         }
 
         public void WriteTo(StreamWriter writer)
